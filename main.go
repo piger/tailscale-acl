@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log/slog"
 	"os"
 
 	"github.com/akedrou/textdiff"
@@ -86,7 +85,7 @@ func main() {
 	}
 
 	if err := run(filename); err != nil {
-		slog.Error("error", "err", err)
+		fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		os.Exit(1)
 	}
 }
