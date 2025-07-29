@@ -9,7 +9,7 @@ import (
 	"github.com/akedrou/textdiff"
 	"github.com/piger/tailscale-acl/internal/config"
 	"github.com/tailscale/hujson"
-	"github.com/tailscale/tailscale-client-go/tailscale"
+	"tailscale.com/client/tailscale/v2"
 )
 
 var (
@@ -28,14 +28,16 @@ func run(filename string) error {
 		return err
 	}
 
-	client, err := tailscale.NewClient(cfg.APIKey, cfg.Tailnet)
-	if err != nil {
-		return err
+	client := &tailscale.Client{
+		Tailnet: cfg.Tailnet,
+		APIKey:  cfg.APIKey,
 	}
 
 	ctx := context.Background()
 
-	rawAcl, err := client.RawACL(ctx)
+	policyFile := client.PolicyFile()
+
+	rawACL, err := policyFile.Raw(ctx)
 	if err != nil {
 		return err
 	}
@@ -45,7 +47,7 @@ func run(filename string) error {
 		return err
 	}
 
-	diffo := textdiff.Unified("old", "new", rawAcl, string(aclNewFmt))
+	diffo := textdiff.Unified("old", "new", rawACL.HuJSON, string(aclNewFmt))
 	if diffo == "" {
 		fmt.Println("ACL unchanged")
 		return nil
@@ -57,11 +59,11 @@ func run(filename string) error {
 
 	if *flagCommit {
 		aclNew := string(aclContents)
-		if err := client.ValidateACL(ctx, aclNew); err != nil {
+		if err := policyFile.Validate(ctx, aclNew); err != nil {
 			return fmt.Errorf("invalid ACL: %w", err)
 		}
 
-		if err := client.SetACL(ctx, aclNew); err != nil {
+		if err := policyFile.Set(ctx, aclNew, ""); err != nil {
 			return fmt.Errorf("error setting ACL: %w", err)
 		}
 	}
