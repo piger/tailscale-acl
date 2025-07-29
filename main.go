@@ -63,7 +63,7 @@ func run(filename string) error {
 			return fmt.Errorf("invalid ACL: %w", err)
 		}
 
-		if err := policyFile.Set(ctx, aclNew, ""); err != nil {
+		if err := policyFile.Set(ctx, aclNew, rawACL.ETag); err != nil {
 			return fmt.Errorf("error setting ACL: %w", err)
 		}
 	}
