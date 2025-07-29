@@ -5,8 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
-	"github.com/akedrou/textdiff"
+	"github.com/peter-evans/patience"
 	"github.com/piger/tailscale-acl/internal/config"
 	"github.com/tailscale/hujson"
 	"tailscale.com/client/tailscale/v2"
@@ -16,6 +17,13 @@ var (
 	flagPreview = flag.Bool("preview", true, "Preview (diff) the changes to the ACL")
 	flagCommit  = flag.Bool("commit", false, "Commit the ACL changes")
 )
+
+func diff(old, new string) string {
+	a := strings.Split(old, "\n")
+	b := strings.Split(new, "\n")
+	diffs := patience.Diff(a, b)
+	return patience.UnifiedDiffText(diffs)
+}
 
 func run(filename string) error {
 	cfg, err := config.Read("config.yml")
@@ -47,7 +55,7 @@ func run(filename string) error {
 		return err
 	}
 
-	diffo := textdiff.Unified("old", "new", rawACL.HuJSON, string(aclNewFmt))
+	diffo := diff(rawACL.HuJSON, string(aclNewFmt))
 	if diffo == "" {
 		fmt.Println("ACL unchanged")
 		return nil
