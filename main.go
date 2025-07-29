@@ -25,24 +25,36 @@ func diff(old, new string) string {
 	return patience.UnifiedDiffText(diffs)
 }
 
+func readACLFile(filename string) (string, error) {
+	b, err := os.ReadFile(filename)
+	if err != nil {
+		return "", fmt.Errorf("reading ACL file: %w", err)
+	}
+
+	bf, err := hujson.Format(b)
+	if err != nil {
+		return "", fmt.Errorf("formatting ACL as HuJSON: %w", err)
+	}
+
+	return string(bf), nil
+}
+
 func run(filename string) error {
 	cfg, err := config.Read("config.yml")
 	if err != nil {
 		return err
 	}
 
-	aclContents, err := os.ReadFile(filename)
+	newACL, err := readACLFile(filename)
 	if err != nil {
 		return err
 	}
 
+	ctx := context.Background()
 	client := &tailscale.Client{
 		Tailnet: cfg.Tailnet,
 		APIKey:  cfg.APIKey,
 	}
-
-	ctx := context.Background()
-
 	policyFile := client.PolicyFile()
 
 	rawACL, err := policyFile.Raw(ctx)
@@ -50,12 +62,7 @@ func run(filename string) error {
 		return err
 	}
 
-	aclNewFmt, err := hujson.Format(aclContents)
-	if err != nil {
-		return err
-	}
-
-	diffo := diff(rawACL.HuJSON, string(aclNewFmt))
+	diffo := diff(rawACL.HuJSON, newACL)
 	if diffo == "" {
 		fmt.Println("ACL unchanged")
 		return nil
@@ -66,12 +73,11 @@ func run(filename string) error {
 	}
 
 	if *flagCommit {
-		aclNew := string(aclContents)
-		if err := policyFile.Validate(ctx, aclNew); err != nil {
+		if err := policyFile.Validate(ctx, newACL); err != nil {
 			return fmt.Errorf("invalid ACL: %w", err)
 		}
 
-		if err := policyFile.Set(ctx, aclNew, rawACL.ETag); err != nil {
+		if err := policyFile.Set(ctx, newACL, rawACL.ETag); err != nil {
 			return fmt.Errorf("error setting ACL: %w", err)
 		}
 	}
